@@ -1,0 +1,44 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  --sw-dark: #085041; /* navbar, dark surfaces       */
+  --sw-dark-mid: #0f6e56; /* button hover                */
+  --sw-green: #1d9e75; /* primary brand, buttons, CTAs*/
+  --sw-teal: #5dcaa5; /* accents, scan ring, logo    */
+  --sw-teal-light: #e6f5ef; /* pass backgrounds            */
+  --sw-bg: #f4fbf8; /* page background             */
+  --sw-pass: #085041;
+  --sw-pass-bg: #e6f5ef;
+  --sw-warn: #d97706;
+  --sw-warn-bg: #fff8e1;
+  --sw-fail: #dc2626;
+  --sw-fail-bg: #fef2f2;
+  --sw-text: #0a1f18;
+  --sw-text-muted: #4b6e60;
+  --sw-border: #c8e6d8;
+  --sw-white: #ffffff;
+  --sw-surface: #f4fbf8;
+}
+
+body {
+  font-family: "Inter", sans-serif;
+  background: var(--sw-surface);
+  color: var(--sw-text);
+  font-size: 16px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: var(--sw-blue);
+  text-decoration: none;
+}
+a:hover {
+  text-decoration: underline;
+}
