@@ -34,9 +34,10 @@ export default function Home() {
     }, 600);
 
     try {
-      const { data } = await axios.post("http://localhost:5000/api/scan", {
-        url,
-      });
+      const { data } = await axios.post(
+        `${import.meta.env.VITE_API_URL}/api/scan`,
+        { url },
+      );
       clearInterval(interval);
       // Store result and navigate
       // NEW

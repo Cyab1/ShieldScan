@@ -25,7 +25,7 @@ export default function Results() {
     async function fetchResult() {
       try {
         const { data } = await axios.get(
-          `http://localhost:5000/api/results/${scanId}`,
+          `${import.meta.env.VITE_API_URL}/api/results/${scanId}`,
         );
         setResult(data);
       } catch (err) {
@@ -55,7 +55,10 @@ export default function Results() {
 
   // ── Addition 1: downloadPdf function ──
   function downloadPdf() {
-    window.open(`http://localhost:5000/api/results/${scanId}/pdf`, "_blank");
+    window.open(
+      `${import.meta.env.VITE_API_URL}/api/results/${scanId}/pdf`,
+      "_blank",
+    );
   }
 
   // ── Loading state ──

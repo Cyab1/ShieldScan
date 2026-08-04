@@ -15,7 +15,11 @@ from pdf_generator import generate_pdf          # <-- Addition 1
 import urllib.parse
 
 app = Flask(__name__)
-CORS(app, origins=["http://localhost:5173"])
+CORS(app, origins=[
+    "http://localhost:5173",
+    "https://shieldscan.vercel.app",
+    "https://shieldscan-*.vercel.app",
+])
 
 # ── Database config ───────────────────────────────────────────────────────────
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
