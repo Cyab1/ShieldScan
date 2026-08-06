@@ -19,6 +19,7 @@ CORS(app, origins=[
     "http://localhost:5173",
     "https://shieldscan.vercel.app",
     "https://shieldscan-*.vercel.app",
+    "https://shieldscan-sage.vercel.app",
 ])
 
 # ── Database config ───────────────────────────────────────────────────────────
