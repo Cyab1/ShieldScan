@@ -1,20 +1,28 @@
 import os
-import io                              # <-- Addition 1
+import io
 import random
 import string
 from datetime import datetime, timezone
 
-from flask import Flask, request, jsonify, send_file   # send_file already there
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import Text
 import json
 
 from scanner import run_scan
-from pdf_generator import generate_pdf          # <-- Addition 1
+from pdf_generator import generate_pdf
 import urllib.parse
 
 app = Flask(__name__)
+limiter = Limiter(
+    get_remote_address,
+    app=app,
+    default_limits=["200 per day", "50 per hour"],
+    storage_uri="memory://",
+)
 CORS(app, origins=[
     "http://localhost:5173",
     "https://shieldscan.vercel.app",
@@ -60,6 +68,7 @@ def generate_scan_id(length: int = 8) -> str:
 
 # ── Routes ────────────────────────────────────────────────────────────────────
 @app.route("/api/scan", methods=["POST"])
+@limiter.limit("5 per day")
 def scan():
     data = request.get_json(silent=True) or {}
     url  = (data.get("url") or "").strip()
@@ -111,7 +120,7 @@ def health():
     return jsonify({"status": "ok", "service": "ShieldScan API"}), 200
 
 
-# ── Addition 2: PDF download route ───────────────────────────────────────────
+# ── PDF download route ────────────────────────────────────────────────────────
 @app.route("/api/results/<scan_id>/pdf", methods=["GET"])
 def download_pdf(scan_id):
     record = ScanResult.query.filter_by(scan_id=scan_id).first()
@@ -130,6 +139,14 @@ def download_pdf(scan_id):
         as_attachment=True,
         download_name=filename
     )
+
+
+# ── Rate‑limit error handler (Change 4) ──────────────────────────────────────
+@app.errorhandler(429)
+def rate_limit_exceeded(e):
+    return jsonify({
+        "error": "Daily scan limit reached. ShieldScan allows 5 free scans per day. Contact stackwiseza@gmail.com to discuss unlimited access."
+    }), 429
 
 
 # ── Init ──────────────────────────────────────────────────────────────────────

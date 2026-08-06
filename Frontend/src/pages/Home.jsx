@@ -143,7 +143,7 @@ export default function Home() {
           Powered by <strong>StackWise</strong>
         </span>
         <span className="footer-dot">·</span>
-        <span>hello@stackwise.co.za</span>
+        <span>stackwiseza@gmail.com</span>
       </footer>
     </main>
   );
