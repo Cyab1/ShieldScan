@@ -83,7 +83,24 @@ export default function Home() {
               {scanning ? "Scanning…" : "Scan now"}
             </button>
           </div>
-          {error && <p className="scan-error">{error}</p>}
+          {error && (
+            <div className="scan-error">
+              {error.includes("Daily scan limit") ? (
+                <p>
+                  Daily scan limit reached. ShieldScan allows 5 free scans per
+                  day.{" "}
+                  <a
+                    href="mailto:stackwiseza@gmail.com?subject=ShieldScan%20Unlimited%20Access&body=Hi%20StackWise%2C%0A%0AI%27ve%20reached%20my%20daily%20scan%20limit%20on%20ShieldScan%20and%20would%20like%20to%20discuss%20unlimited%20access.%0A%0AMy%20website%3A%20%0AMy%20name%3A%20%0A%0AThank%20you"
+                    className="scan-error-link"
+                  >
+                    Click here to request unlimited access →
+                  </a>
+                </p>
+              ) : (
+                <p>{error}</p>
+              )}
+            </div>
+          )}
         </form>
 
         {scanning && (

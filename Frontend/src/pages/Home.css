@@ -219,3 +219,15 @@
 .footer-dot {
   color: #cbd5e1;
 }
+
+.scan-error-link {
+  color: var(--sw-green);
+  font-weight: 600;
+  text-decoration: underline;
+  display: inline-block;
+  margin-top: 4px;
+}
+
+.scan-error-link:hover {
+  color: var(--sw-dark);
+}
