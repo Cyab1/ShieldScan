@@ -23,12 +23,16 @@ limiter = Limiter(
     default_limits=["200 per day", "50 per hour"],
     storage_uri="memory://",
 )
-CORS(app, origins=[
-    "http://localhost:5173",
-    "https://shieldscan.vercel.app",
-    "https://shieldscan-*.vercel.app",
-    "https://shieldscan-sage.vercel.app",
-])
+CORS(
+    app,
+    origins=[
+        "http://localhost:5173",
+        "https://shieldscan.vercel.app",
+        "https://shieldscan-*.vercel.app",
+        "https://shieldscan-sage.vercel.app",
+        "https://shieldscan.stackwiseza.co.za",
+    ],
+)
 
 # ── Database config ───────────────────────────────────────────────────────────
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
@@ -43,14 +47,14 @@ db = SQLAlchemy(app)
 class ScanResult(db.Model):
     __tablename__ = "scan_results"
 
-    id         = db.Column(db.Integer, primary_key=True)
-    scan_id    = db.Column(db.String(12), unique=True, nullable=False, index=True)
-    url        = db.Column(db.String(2048), nullable=False)
+    id = db.Column(db.Integer, primary_key=True)
+    scan_id = db.Column(db.String(12), unique=True, nullable=False, index=True)
+    url = db.Column(db.String(2048), nullable=False)
     scanned_at = db.Column(db.DateTime, nullable=False)
-    grade      = db.Column(db.String(1), nullable=False)
-    score      = db.Column(db.Integer, nullable=False)
+    grade = db.Column(db.String(1), nullable=False)
+    score = db.Column(db.Integer, nullable=False)
     percentage = db.Column(db.Float, nullable=False)
-    result_json = db.Column(Text, nullable=False)   # full result stored as JSON
+    result_json = db.Column(Text, nullable=False)  # full result stored as JSON
 
     def to_dict(self):
         return json.loads(self.result_json)
@@ -71,7 +75,7 @@ def generate_scan_id(length: int = 8) -> str:
 @limiter.limit("5 per day")
 def scan():
     data = request.get_json(silent=True) or {}
-    url  = (data.get("url") or "").strip()
+    url = (data.get("url") or "").strip()
 
     if not url:
         return jsonify({"error": "No URL provided."}), 400
@@ -90,16 +94,16 @@ def scan():
 
     # Generate ID and save to DB
     scan_id = generate_scan_id()
-    result["scan_id"] = scan_id          # attach ID to the result object
+    result["scan_id"] = scan_id  # attach ID to the result object
 
     record = ScanResult(
-        scan_id     = scan_id,
-        url         = result["url"],
-        scanned_at  = datetime.now(timezone.utc),
-        grade       = result["grade"],
-        score       = result["score"],
-        percentage  = result["percentage"],
-        result_json = json.dumps(result),
+        scan_id=scan_id,
+        url=result["url"],
+        scanned_at=datetime.now(timezone.utc),
+        grade=result["grade"],
+        score=result["score"],
+        percentage=result["percentage"],
+        result_json=json.dumps(result),
     )
     db.session.add(record)
     db.session.commit()
@@ -130,23 +134,30 @@ def download_pdf(scan_id):
     result = record.to_dict()
     pdf_bytes = generate_pdf(result)
 
-    safe_url = result["url"].replace("https://", "").replace("http://", "").replace("/", "_")
+    safe_url = (
+        result["url"].replace("https://", "").replace("http://", "").replace("/", "_")
+    )
     filename = f"ShieldScan_{safe_url}_{scan_id}.pdf"
 
     return send_file(
         io.BytesIO(pdf_bytes),
         mimetype="application/pdf",
         as_attachment=True,
-        download_name=filename
+        download_name=filename,
     )
 
 
 # ── Rate‑limit error handler (Change 4) ──────────────────────────────────────
 @app.errorhandler(429)
 def rate_limit_exceeded(e):
-    return jsonify({
-        "error": "Daily scan limit reached. ShieldScan allows 5 free scans per day. Contact stackwiseza@gmail.com to discuss unlimited access."
-    }), 429
+    return (
+        jsonify(
+            {
+                "error": "Daily scan limit reached. ShieldScan allows 5 free scans per day. Contact stackwiseza@gmail.com to discuss unlimited access."
+            }
+        ),
+        429,
+    )
 
 
 # ── Init ──────────────────────────────────────────────────────────────────────
