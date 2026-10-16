@@ -231,3 +231,14 @@
 .scan-error-link:hover {
   color: var(--sw-dark);
 }
+
+.footer-privacy {
+  color: #a0aec0;
+  font-size: 13px;
+  text-decoration: none;
+}
+
+.footer-privacy:hover {
+  color: var(--sw-green);
+  text-decoration: underline;
+}

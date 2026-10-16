@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import axios from "axios";
 import "./Home.css";
 
@@ -157,10 +158,14 @@ export default function Home() {
 
       <footer className="home-footer">
         <span>
-          Powered by <strong>StackWise</strong>
+          Powered by <strong>StackWise (Pty) Ltd</strong>
         </span>
         <span className="footer-dot">·</span>
         <span>stackwiseza@gmail.com</span>
+        <span className="footer-dot">·</span>
+        <Link to="/privacy" className="footer-privacy">
+          Privacy Policy
+        </Link>
       </footer>
     </main>
   );
