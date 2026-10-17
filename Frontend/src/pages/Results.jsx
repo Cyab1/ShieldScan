@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import axios from "axios";
+import { Link } from 'react-router-dom'
 import "./Results.css";
 
 const STATUS_LABELS = { pass: "Pass", warning: "Warning", fail: "Fail" };
@@ -261,6 +262,10 @@ export default function Results() {
             ShieldScan
             {" · "}
             <a href="mailto:stackwiseza@gmail.com">stackwiseza@gmail.com</a>
+            {" · "}
+            <Link to="/privacy">Privacy Policy</Link>
+            {" · "}
+            <Link to="/terms">Terms of Use</Link>
           </p>
         </div>
       </section>

@@ -166,6 +166,10 @@ export default function Home() {
         <Link to="/privacy" className="footer-privacy">
           Privacy Policy
         </Link>
+        <span className="footer-dot">·</span>
+        <Link to="/terms" className="footer-privacy">
+          Terms of Use
+        </Link>
       </footer>
     </main>
   );
