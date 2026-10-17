@@ -54,7 +54,7 @@ class ScanResult(db.Model):
     grade = db.Column(db.String(1), nullable=False)
     score = db.Column(db.Integer, nullable=False)
     percentage = db.Column(db.Float, nullable=False)
-    result_json = db.Column(Text, nullable=False)  # full result stored as JSON
+    result_json = db.Column(Text, nullable=False)
 
     def to_dict(self):
         return json.loads(self.result_json)
@@ -89,12 +89,10 @@ def scan():
     except ValueError:
         return jsonify({"error": "Invalid URL format."}), 400
 
-    # Run the scan
     result = run_scan(url)
 
-    # Generate ID and save to DB
     scan_id = generate_scan_id()
-    result["scan_id"] = scan_id  # attach ID to the result object
+    result["scan_id"] = scan_id
 
     record = ScanResult(
         scan_id=scan_id,
@@ -120,11 +118,11 @@ def get_result(scan_id):
 
 
 @app.route("/api/health", methods=["GET"])
+@limiter.exempt
 def health():
     return jsonify({"status": "ok", "service": "ShieldScan API"}), 200
 
 
-# ── PDF download route ────────────────────────────────────────────────────────
 @app.route("/api/results/<scan_id>/pdf", methods=["GET"])
 def download_pdf(scan_id):
     record = ScanResult.query.filter_by(scan_id=scan_id).first()
@@ -147,7 +145,6 @@ def download_pdf(scan_id):
     )
 
 
-# ── Rate‑limit error handler (Change 4) ──────────────────────────────────────
 @app.errorhandler(429)
 def rate_limit_exceeded(e):
     return (
