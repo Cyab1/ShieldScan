@@ -233,7 +233,7 @@ def _footer(canvas, doc):
     canvas.drawString(
         MARGIN,
         9 * mm,
-        f"StackWise (Pty) Ltd  ·  ShieldScan  ·  stackwiseza@gmail.com  ·  www.stackwiseza.co.za",
+        f"StackWise (Pty) Ltd  ·  ShieldScan  ·  hello@stackwiseza.co.za  ·  www.stackwiseza.co.za",
     )  # <-- updated
     canvas.drawRightString(W - MARGIN, 9 * mm, f"Page {doc.page}")
     canvas.restoreState()
@@ -509,7 +509,7 @@ def generate_pdf(result: dict) -> bytes:
             "This report was generated automatically by ShieldScan. It reflects the "
             "security posture of the scanned URL at the time of the scan. It does not "
             "constitute a full penetration test. For a comprehensive security audit, "
-            "contact StackWise (Pty) Ltd at stackwiseza@gmail.com.",  # <-- updated
+            "contact StackWise (Pty) Ltd at hello@stackwiseza.co.za.",  # <-- updated
             styles["muted"],
         )
     )

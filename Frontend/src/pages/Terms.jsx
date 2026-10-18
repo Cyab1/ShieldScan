@@ -174,8 +174,8 @@ export default function Terms() {
             ShieldScan is a free service limited to 5 scans per IP address per
             day. This limit exists to ensure fair access for all users and to
             prevent abuse. If you need more scans, contact us at{" "}
-            <a href="mailto:stackwiseza@gmail.com">stackwiseza@gmail.com</a> to
-            discuss access options.
+            <a href="mailto:hello@stackwiseza.co.za">hello@stackwiseza.co.za</a>{" "}
+            to discuss access options.
           </p>
         </section>
 
@@ -212,8 +212,8 @@ export default function Terms() {
           <p>
             For any questions about these Terms of Use, contact StackWise (Pty)
             Ltd at{" "}
-            <a href="mailto:stackwiseza@gmail.com">stackwiseza@gmail.com</a> or
-            visit{" "}
+            <a href="mailto:hello@stackwiseza.co.za">hello@stackwiseza.co.za</a>{" "}
+            or visit{" "}
             <a
               href="https://www.stackwiseza.co.za"
               target="_blank"

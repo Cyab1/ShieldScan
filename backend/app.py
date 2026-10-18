@@ -150,7 +150,7 @@ def rate_limit_exceeded(e):
     return (
         jsonify(
             {
-                "error": "Daily scan limit reached. ShieldScan allows 5 free scans per day. Contact stackwiseza@gmail.com to discuss unlimited access."
+                "error": "Daily scan limit reached. ShieldScan allows 5 free scans per day. Contact hello@stackwiseza.co.za to discuss unlimited access."
             }
         ),
         429,

@@ -24,7 +24,8 @@ export default function Privacy() {
             "responsible party" for your information under the Protection of
             Personal Information Act 4 of 2013 (POPIA). Our information officer
             is Siyabonga Ndlovu, who can be contacted at{" "}
-            <a href="mailto:stackwiseza@gmail.com">stackwiseza@gmail.com</a>.
+            <a href="mailto:hello@stackwiseza.co.za">hello@stackwiseza.co.za</a>
+            .
           </p>
         </section>
 
@@ -134,7 +135,9 @@ export default function Privacy() {
             <li>
               <strong>Deletion on request:</strong> if you would like your scan
               data deleted sooner, contact us at{" "}
-              <a href="mailto:stackwiseza@gmail.com">stackwiseza@gmail.com</a>{" "}
+              <a href="mailto:hello@stackwiseza.co.za">
+                hello@stackwiseza.co.za
+              </a>{" "}
               and we will remove it within 7 business days. Deleting a scan also
               stops its shared link from working.
             </li>
@@ -184,7 +187,7 @@ export default function Privacy() {
           </ul>
           <p>
             To exercise any of these rights, contact us at{" "}
-            <a href="mailto:stackwiseza@gmail.com">stackwiseza@gmail.com</a>. We
+            <a href="mailto:"></a>. We
             will respond within a reasonable time.
           </p>
         </section>
@@ -194,8 +197,8 @@ export default function Privacy() {
           <p>
             If you believe we have handled your information unlawfully, please
             contact us first at{" "}
-            <a href="mailto:stackwiseza@gmail.com">stackwiseza@gmail.com</a> so
-            that we can try to resolve it. You also have the right to lodge a
+            <a href="mailto:hello@stackwiseza.co.za">hello@stackwiseza.co.za</a>{" "}
+            so that we can try to resolve it. You also have the right to lodge a
             complaint with the Information Regulator of South Africa at{" "}
             <a
               href="https://www.inforegulator.org.za"
@@ -229,8 +232,8 @@ export default function Privacy() {
           <p>
             For any privacy-related questions or concerns, contact StackWise
             (Pty) Ltd at{" "}
-            <a href="mailto:stackwiseza@gmail.com">stackwiseza@gmail.com</a> or
-            visit{" "}
+            <a href="mailto:hello@stackwiseza.co.za">hello@stackwiseza.co.za</a>{" "}
+            or visit{" "}
             <a
               href="https://www.stackwiseza.co.za"
               target="_blank"

@@ -29,7 +29,6 @@ export default function Home() {
     setScanning(true);
     setStepIndex(0);
 
-    // Cycle through step messages while waiting
     const interval = setInterval(() => {
       setStepIndex((i) => (i + 1 < SCAN_STEPS.length ? i + 1 : i));
     }, 600);
@@ -40,8 +39,6 @@ export default function Home() {
         { url },
       );
       clearInterval(interval);
-      // Store result and navigate
-      // NEW
       navigate(`/results/${data.scan_id}`);
     } catch (err) {
       clearInterval(interval);
@@ -91,7 +88,7 @@ export default function Home() {
                   Daily scan limit reached. ShieldScan allows 5 free scans per
                   day.{" "}
                   <a
-                    href="mailto:stackwiseza@gmail.com?subject=ShieldScan%20Unlimited%20Access&body=Hi%20StackWise%2C%0A%0AI%27ve%20reached%20my%20daily%20scan%20limit%20on%20ShieldScan%20and%20would%20like%20to%20discuss%20unlimited%20access.%0A%0AMy%20website%3A%20%0AMy%20name%3A%20%0A%0AThank%20you"
+                    href="mailto:hello@stackwiseza.co.za?subject=ShieldScan%20Unlimited%20Access&body=Hi%20StackWise%2C%0A%0AI%27ve%20reached%20my%20daily%20scan%20limit%20on%20ShieldScan%20and%20would%20like%20to%20discuss%20unlimited%20access.%0A%0AMy%20website%3A%20%0AMy%20name%3A%20%0A%0AThank%20you"
                     className="scan-error-link"
                   >
                     Click here to request unlimited access →
@@ -114,7 +111,7 @@ export default function Home() {
                     cy="40"
                     r="34"
                     fill="none"
-                    stroke="#E0F2F1"
+                    stroke="#E6F5EF"
                     strokeWidth="4"
                   />
                   <circle
@@ -122,7 +119,7 @@ export default function Home() {
                     cy="40"
                     r="34"
                     fill="none"
-                    stroke="#00BFA5"
+                    stroke="#1D9E75"
                     strokeWidth="4"
                     strokeDasharray="60 154"
                     strokeLinecap="round"
@@ -161,7 +158,9 @@ export default function Home() {
           Powered by <strong>StackWise (Pty) Ltd</strong>
         </span>
         <span className="footer-dot">·</span>
-        <span>stackwiseza@gmail.com</span>
+        <a href="mailto:hello@stackwiseza.co.za" className="footer-privacy">
+          hello@stackwiseza.co.za
+        </a>
         <span className="footer-dot">·</span>
         <Link to="/privacy" className="footer-privacy">
           Privacy Policy
