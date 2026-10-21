@@ -10,7 +10,7 @@ from flask_limiter.util import get_remote_address
 from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import Text
+from sqlalchemy import Text, func
 import json
 
 from scanner import run_scan
@@ -35,6 +35,20 @@ def require_admin(f):
     return decorated
 
 
+# ── CORS ──────────────────────────────────────────────────────────────────────
+CORS(
+    app,
+    origins=[
+        "http://localhost:5173",
+        "https://shieldscan.vercel.app",
+        "https://shieldscan-*.vercel.app",
+        "https://shieldscan-sage.vercel.app",
+        "https://shieldscan.stackwiseza.co.za",
+    ],
+    supports_credentials=True,
+)
+
+
 # ── Limiter ───────────────────────────────────────────────────────────────────
 def get_ip():
     return request.remote_addr
@@ -45,17 +59,6 @@ limiter = Limiter(
     app=app,
     default_limits=["200 per day", "50 per hour"],
     storage_uri="memory://",
-)
-
-CORS(
-    app,
-    origins=[
-        "http://localhost:5173",
-        "https://shieldscan.vercel.app",
-        "https://shieldscan-*.vercel.app",
-        "https://shieldscan-sage.vercel.app",
-        "https://shieldscan.stackwiseza.co.za",
-    ],
 )
 
 # ── Database ──────────────────────────────────────────────────────────────────
@@ -144,8 +147,9 @@ def is_whitelisted(ip: str) -> bool:
     return WhitelistedIP.query.filter_by(ip_address=ip).first() is not None
 
 
-# ── Routes ────────────────────────────────────────────────────────────────────
+# ── Scan ──────────────────────────────────────────────────────────────────────
 @app.route("/api/scan", methods=["POST"])
+@limiter.limit("5 per day", exempt_when=lambda: is_whitelisted(get_ip()))
 def scan():
     data = request.get_json(silent=True) or {}
     url = (data.get("url") or "").strip()
@@ -162,14 +166,6 @@ def scan():
             raise ValueError
     except ValueError:
         return jsonify({"error": "Invalid URL format."}), 400
-
-    # Check whitelist before rate limiting
-    if not is_whitelisted(ip):
-        # Apply rate limit manually
-        with app.test_request_context():
-            pass
-        decorator = limiter.limit("5 per day")
-        # We'll handle this via the error handler below
 
     result = run_scan(url)
     scan_id = generate_scan_id()
@@ -240,60 +236,57 @@ def admin_login():
 @app.route("/api/admin/stats", methods=["GET"])
 @require_admin
 def admin_stats():
-    total = ScanResult.query.count()
-    today = datetime.now(timezone.utc).date()
-    today_count = ScanResult.query.filter(
-        db.func.date(ScanResult.scanned_at) == today
-    ).count()
-
-    # Grade breakdown
-    grades = {}
-    for g in ["A", "B", "C", "D", "F"]:
-        grades[g] = ScanResult.query.filter_by(grade=g).count()
-
-    # Daily volume — last 7 days
-    daily = []
-    for i in range(6, -1, -1):
-        day = today - timedelta(days=i)
-        count = ScanResult.query.filter(
-            db.func.date(ScanResult.scanned_at) == day
+    try:
+        total = ScanResult.query.count()
+        today = datetime.now(timezone.utc).date()
+        today_count = ScanResult.query.filter(
+            db.func.date(ScanResult.scanned_at) == today
         ).count()
-        daily.append({"date": day.isoformat(), "count": count})
 
-    # Rate limit hits
-    rate_hits = RateLimitHit.query.count()
-    rate_hits_today = RateLimitHit.query.filter(
-        db.func.date(RateLimitHit.hit_at) == today
-    ).count()
+        grades = {}
+        for g in ["A", "B", "C", "D", "F"]:
+            grades[g] = ScanResult.query.filter_by(grade=g).count()
 
-    # Most scanned sites
-    from sqlalchemy import func
+        daily = []
+        for i in range(6, -1, -1):
+            day = today - timedelta(days=i)
+            count = ScanResult.query.filter(
+                db.func.date(ScanResult.scanned_at) == day
+            ).count()
+            daily.append({"date": day.isoformat(), "count": count})
 
-    top_sites = (
-        db.session.query(ScanResult.url, func.count(ScanResult.url).label("count"))
-        .group_by(ScanResult.url)
-        .order_by(func.count(ScanResult.url).desc())
-        .limit(5)
-        .all()
-    )
+        rate_hits = RateLimitHit.query.count()
+        rate_hits_today = RateLimitHit.query.filter(
+            db.func.date(RateLimitHit.hit_at) == today
+        ).count()
 
-    return (
-        jsonify(
-            {
-                "total_scans": total,
-                "scans_today": today_count,
-                "grade_breakdown": grades,
-                "daily_volume": daily,
-                "rate_limit_hits": rate_hits,
-                "rate_hits_today": rate_hits_today,
-                "top_sites": [{"url": s.url, "count": s.count} for s in top_sites],
-            }
-        ),
-        200,
-    )
+        top_sites = (
+            db.session.query(ScanResult.url, func.count(ScanResult.url).label("count"))
+            .group_by(ScanResult.url)
+            .order_by(func.count(ScanResult.url).desc())
+            .limit(5)
+            .all()
+        )
+
+        return (
+            jsonify(
+                {
+                    "total_scans": total,
+                    "scans_today": today_count,
+                    "grade_breakdown": grades,
+                    "daily_volume": daily,
+                    "rate_limit_hits": rate_hits,
+                    "rate_hits_today": rate_hits_today,
+                    "top_sites": [{"url": s.url, "count": s.count} for s in top_sites],
+                }
+            ),
+            200,
+        )
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
-# ── Admin recent scans ────────────────────────────────────────────────────────
+# ── Admin scans ───────────────────────────────────────────────────────────────
 @app.route("/api/admin/scans", methods=["GET"])
 @require_admin
 def admin_scans():
@@ -328,12 +321,10 @@ def admin_scans():
     )
 
 
-# ── Admin rate limit hits ─────────────────────────────────────────────────────
+# ── Admin rate hits ───────────────────────────────────────────────────────────
 @app.route("/api/admin/rate-hits", methods=["GET"])
 @require_admin
 def admin_rate_hits():
-    from sqlalchemy import func
-
     hits = (
         db.session.query(
             RateLimitHit.ip_address,
@@ -401,11 +392,14 @@ def remove_whitelist(entry_id):
 # ── Rate limit error handler ──────────────────────────────────────────────────
 @app.errorhandler(429)
 def rate_limit_exceeded(e):
-    ip = get_ip()
-    url = request.get_json(silent=True, force=True) or {}
-    hit = RateLimitHit(ip_address=ip, url=url.get("url", ""))
-    db.session.add(hit)
-    db.session.commit()
+    try:
+        ip = get_ip()
+        url = (request.get_json(silent=True, force=True) or {}).get("url", "")
+        hit = RateLimitHit(ip_address=ip, url=url)
+        db.session.add(hit)
+        db.session.commit()
+    except Exception:
+        pass
     return (
         jsonify(
             {
@@ -416,19 +410,18 @@ def rate_limit_exceeded(e):
     )
 
 
-# ── Scan route with whitelist check ──────────────────────────────────────────
-# Override scan to apply rate limit only for non-whitelisted IPs
-@app.before_request
-def check_whitelist_before_limit():
-    if request.endpoint == "scan" and request.method == "POST":
-        ip = get_ip()
-        if is_whitelisted(ip):
-            limiter.exempt(scan)
-
-
 # ── Init ──────────────────────────────────────────────────────────────────────
 with app.app_context():
     db.create_all()
+    # Add ip_address column to existing databases
+    try:
+        with db.engine.connect() as conn:
+            conn.execute(
+                db.text("ALTER TABLE scan_results ADD COLUMN ip_address VARCHAR(64)")
+            )
+            conn.commit()
+    except Exception:
+        pass  # Column already exists
 
 if __name__ == "__main__":
     app.run(debug=True, port=5000)
