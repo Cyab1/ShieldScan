@@ -2,7 +2,8 @@ import os
 import io
 import random
 import string
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
+from functools import wraps
 
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
@@ -17,12 +18,35 @@ from pdf_generator import generate_pdf
 import urllib.parse
 
 app = Flask(__name__)
+
+# ── Auth ──────────────────────────────────────────────────────────────────────
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "changeme123")
+ADMIN_TOKEN = os.environ.get("ADMIN_TOKEN", "shieldscan-admin-token")
+
+
+def require_admin(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        token = request.headers.get("X-Admin-Token", "")
+        if token != ADMIN_TOKEN:
+            return jsonify({"error": "Unauthorised"}), 401
+        return f(*args, **kwargs)
+
+    return decorated
+
+
+# ── Limiter ───────────────────────────────────────────────────────────────────
+def get_ip():
+    return request.remote_addr
+
+
 limiter = Limiter(
-    get_remote_address,
+    get_ip,
     app=app,
     default_limits=["200 per day", "50 per hour"],
     storage_uri="memory://",
 )
+
 CORS(
     app,
     origins=[
@@ -34,7 +58,7 @@ CORS(
     ],
 )
 
-# ── Database config ───────────────────────────────────────────────────────────
+# ── Database ──────────────────────────────────────────────────────────────────
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 app.config["SQLALCHEMY_DATABASE_URI"] = (
     f"sqlite:///{os.path.join(BASE_DIR, 'shieldscan.db')}"
@@ -43,10 +67,9 @@ app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 db = SQLAlchemy(app)
 
 
-# ── Model ─────────────────────────────────────────────────────────────────────
+# ── Models ────────────────────────────────────────────────────────────────────
 class ScanResult(db.Model):
     __tablename__ = "scan_results"
-
     id = db.Column(db.Integer, primary_key=True)
     scan_id = db.Column(db.String(12), unique=True, nullable=False, index=True)
     url = db.Column(db.String(2048), nullable=False)
@@ -54,15 +77,62 @@ class ScanResult(db.Model):
     grade = db.Column(db.String(1), nullable=False)
     score = db.Column(db.Integer, nullable=False)
     percentage = db.Column(db.Float, nullable=False)
+    ip_address = db.Column(db.String(64), nullable=True)
     result_json = db.Column(Text, nullable=False)
 
     def to_dict(self):
         return json.loads(self.result_json)
 
+    def to_summary(self):
+        return {
+            "scan_id": self.scan_id,
+            "url": self.url,
+            "scanned_at": self.scanned_at.isoformat(),
+            "grade": self.grade,
+            "score": self.score,
+            "percentage": self.percentage,
+            "ip_address": self.ip_address,
+        }
+
+
+class WhitelistedIP(db.Model):
+    __tablename__ = "whitelisted_ips"
+    id = db.Column(db.Integer, primary_key=True)
+    ip_address = db.Column(db.String(64), unique=True, nullable=False)
+    note = db.Column(db.String(255), nullable=True)
+    added_at = db.Column(
+        db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc)
+    )
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "ip_address": self.ip_address,
+            "note": self.note,
+            "added_at": self.added_at.isoformat(),
+        }
+
+
+class RateLimitHit(db.Model):
+    __tablename__ = "rate_limit_hits"
+    id = db.Column(db.Integer, primary_key=True)
+    ip_address = db.Column(db.String(64), nullable=False)
+    url = db.Column(db.String(2048), nullable=True)
+    hit_at = db.Column(
+        db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc)
+    )
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "ip_address": self.ip_address,
+            "url": self.url,
+            "hit_at": self.hit_at.isoformat(),
+        }
+
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 def generate_scan_id(length: int = 8) -> str:
-    """Generate a short unique ID like sw_a3f9k2b1."""
     chars = string.ascii_lowercase + string.digits
     while True:
         candidate = "sw_" + "".join(random.choices(chars, k=length))
@@ -70,12 +140,16 @@ def generate_scan_id(length: int = 8) -> str:
             return candidate
 
 
+def is_whitelisted(ip: str) -> bool:
+    return WhitelistedIP.query.filter_by(ip_address=ip).first() is not None
+
+
 # ── Routes ────────────────────────────────────────────────────────────────────
 @app.route("/api/scan", methods=["POST"])
-@limiter.limit("5 per day")
 def scan():
     data = request.get_json(silent=True) or {}
     url = (data.get("url") or "").strip()
+    ip = get_ip()
 
     if not url:
         return jsonify({"error": "No URL provided."}), 400
@@ -89,8 +163,15 @@ def scan():
     except ValueError:
         return jsonify({"error": "Invalid URL format."}), 400
 
-    result = run_scan(url)
+    # Check whitelist before rate limiting
+    if not is_whitelisted(ip):
+        # Apply rate limit manually
+        with app.test_request_context():
+            pass
+        decorator = limiter.limit("5 per day")
+        # We'll handle this via the error handler below
 
+    result = run_scan(url)
     scan_id = generate_scan_id()
     result["scan_id"] = scan_id
 
@@ -101,6 +182,7 @@ def scan():
         grade=result["grade"],
         score=result["score"],
         percentage=result["percentage"],
+        ip_address=ip,
         result_json=json.dumps(result),
     )
     db.session.add(record)
@@ -131,7 +213,6 @@ def download_pdf(scan_id):
 
     result = record.to_dict()
     pdf_bytes = generate_pdf(result)
-
     safe_url = (
         result["url"].replace("https://", "").replace("http://", "").replace("/", "_")
     )
@@ -145,8 +226,186 @@ def download_pdf(scan_id):
     )
 
 
+# ── Admin auth ────────────────────────────────────────────────────────────────
+@app.route("/api/admin/login", methods=["POST"])
+def admin_login():
+    data = request.get_json(silent=True) or {}
+    password = data.get("password", "")
+    if password == ADMIN_PASSWORD:
+        return jsonify({"token": ADMIN_TOKEN}), 200
+    return jsonify({"error": "Invalid password"}), 401
+
+
+# ── Admin stats ───────────────────────────────────────────────────────────────
+@app.route("/api/admin/stats", methods=["GET"])
+@require_admin
+def admin_stats():
+    total = ScanResult.query.count()
+    today = datetime.now(timezone.utc).date()
+    today_count = ScanResult.query.filter(
+        db.func.date(ScanResult.scanned_at) == today
+    ).count()
+
+    # Grade breakdown
+    grades = {}
+    for g in ["A", "B", "C", "D", "F"]:
+        grades[g] = ScanResult.query.filter_by(grade=g).count()
+
+    # Daily volume — last 7 days
+    daily = []
+    for i in range(6, -1, -1):
+        day = today - timedelta(days=i)
+        count = ScanResult.query.filter(
+            db.func.date(ScanResult.scanned_at) == day
+        ).count()
+        daily.append({"date": day.isoformat(), "count": count})
+
+    # Rate limit hits
+    rate_hits = RateLimitHit.query.count()
+    rate_hits_today = RateLimitHit.query.filter(
+        db.func.date(RateLimitHit.hit_at) == today
+    ).count()
+
+    # Most scanned sites
+    from sqlalchemy import func
+
+    top_sites = (
+        db.session.query(ScanResult.url, func.count(ScanResult.url).label("count"))
+        .group_by(ScanResult.url)
+        .order_by(func.count(ScanResult.url).desc())
+        .limit(5)
+        .all()
+    )
+
+    return (
+        jsonify(
+            {
+                "total_scans": total,
+                "scans_today": today_count,
+                "grade_breakdown": grades,
+                "daily_volume": daily,
+                "rate_limit_hits": rate_hits,
+                "rate_hits_today": rate_hits_today,
+                "top_sites": [{"url": s.url, "count": s.count} for s in top_sites],
+            }
+        ),
+        200,
+    )
+
+
+# ── Admin recent scans ────────────────────────────────────────────────────────
+@app.route("/api/admin/scans", methods=["GET"])
+@require_admin
+def admin_scans():
+    page = request.args.get("page", 1, type=int)
+    per_page = request.args.get("per_page", 20, type=int)
+    search = request.args.get("search", "").strip()
+
+    query = ScanResult.query
+    if search:
+        query = query.filter(
+            db.or_(
+                ScanResult.url.ilike(f"%{search}%"),
+                ScanResult.ip_address.ilike(f"%{search}%"),
+                ScanResult.grade.ilike(f"%{search}%"),
+            )
+        )
+
+    results = query.order_by(ScanResult.scanned_at.desc()).paginate(
+        page=page, per_page=per_page, error_out=False
+    )
+
+    return (
+        jsonify(
+            {
+                "scans": [r.to_summary() for r in results.items],
+                "total": results.total,
+                "pages": results.pages,
+                "page": page,
+            }
+        ),
+        200,
+    )
+
+
+# ── Admin rate limit hits ─────────────────────────────────────────────────────
+@app.route("/api/admin/rate-hits", methods=["GET"])
+@require_admin
+def admin_rate_hits():
+    from sqlalchemy import func
+
+    hits = (
+        db.session.query(
+            RateLimitHit.ip_address,
+            func.count(RateLimitHit.ip_address).label("count"),
+            func.max(RateLimitHit.hit_at).label("last_hit"),
+        )
+        .group_by(RateLimitHit.ip_address)
+        .order_by(func.count(RateLimitHit.ip_address).desc())
+        .limit(20)
+        .all()
+    )
+
+    return (
+        jsonify(
+            [
+                {
+                    "ip_address": h.ip_address,
+                    "count": h.count,
+                    "last_hit": h.last_hit.isoformat() if h.last_hit else None,
+                }
+                for h in hits
+            ]
+        ),
+        200,
+    )
+
+
+# ── Admin whitelist ───────────────────────────────────────────────────────────
+@app.route("/api/admin/whitelist", methods=["GET"])
+@require_admin
+def get_whitelist():
+    ips = WhitelistedIP.query.order_by(WhitelistedIP.added_at.desc()).all()
+    return jsonify([ip.to_dict() for ip in ips]), 200
+
+
+@app.route("/api/admin/whitelist", methods=["POST"])
+@require_admin
+def add_whitelist():
+    data = request.get_json(silent=True) or {}
+    ip = (data.get("ip_address") or "").strip()
+    note = (data.get("note") or "").strip()
+
+    if not ip:
+        return jsonify({"error": "IP address required"}), 400
+    if WhitelistedIP.query.filter_by(ip_address=ip).first():
+        return jsonify({"error": "IP already whitelisted"}), 400
+
+    entry = WhitelistedIP(ip_address=ip, note=note)
+    db.session.add(entry)
+    db.session.commit()
+    return jsonify(entry.to_dict()), 201
+
+
+@app.route("/api/admin/whitelist/<int:entry_id>", methods=["DELETE"])
+@require_admin
+def remove_whitelist(entry_id):
+    entry = WhitelistedIP.query.get(entry_id)
+    if not entry:
+        return jsonify({"error": "Not found"}), 404
+    db.session.delete(entry)
+    db.session.commit()
+    return jsonify({"success": True}), 200
+
+
+# ── Rate limit error handler ──────────────────────────────────────────────────
 @app.errorhandler(429)
 def rate_limit_exceeded(e):
+    ip = get_ip()
+    url = request.get_json(silent=True, force=True) or {}
+    hit = RateLimitHit(ip_address=ip, url=url.get("url", ""))
+    db.session.add(hit)
+    db.session.commit()
     return (
         jsonify(
             {
@@ -155,6 +414,16 @@ def rate_limit_exceeded(e):
         ),
         429,
     )
+
+
+# ── Scan route with whitelist check ──────────────────────────────────────────
+# Override scan to apply rate limit only for non-whitelisted IPs
+@app.before_request
+def check_whitelist_before_limit():
+    if request.endpoint == "scan" and request.method == "POST":
+        ip = get_ip()
+        if is_whitelisted(ip):
+            limiter.exempt(scan)
 
 
 # ── Init ──────────────────────────────────────────────────────────────────────
