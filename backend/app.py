@@ -413,9 +413,10 @@ def rate_limit_exceeded(e):
 @app.route("/api/admin/debug", methods=["GET"])
 def debug():
     try:
-        with app.app_context():
-            db.create_all()
-        tables = db.engine.table_names()
+        from sqlalchemy import inspect
+
+        inspector = inspect(db.engine)
+        tables = inspector.get_table_names()
         return jsonify({"tables": tables}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
