@@ -44,6 +44,9 @@ CORS(
         "https://shieldscan-*.vercel.app",
         "https://shieldscan-sage.vercel.app",
         "https://shieldscan.stackwiseza.co.za",
+        "https://www.stackwiseza.co.za",
+        "https://stackwiseza.co.za",
+        "https://stack-wise-home*.vercel.app",
     ],
     supports_credentials=True,
 )
@@ -131,6 +134,37 @@ class RateLimitHit(db.Model):
             "ip_address": self.ip_address,
             "url": self.url,
             "hit_at": self.hit_at.isoformat(),
+        }
+
+
+class NewsPost(db.Model):
+    __tablename__ = "news_posts"
+    id = db.Column(db.Integer, primary_key=True)
+    type = db.Column(db.String(32), nullable=False, default="launch")
+    title = db.Column(db.String(255), nullable=False)
+    summary = db.Column(db.Text, nullable=False)
+    body = db.Column(db.Text, nullable=False)
+    url = db.Column(db.String(2048), nullable=True)
+    url_label = db.Column(db.String(255), nullable=True)
+    internal = db.Column(db.Boolean, default=False)
+    published = db.Column(db.Boolean, default=True)
+    created_at = db.Column(
+        db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc)
+    )
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "type": self.type,
+            "title": self.title,
+            "summary": self.summary,
+            "body": self.body,
+            "url": self.url,
+            "url_label": self.url_label,
+            "internal": self.internal,
+            "published": self.published,
+            "date": self.created_at.strftime("%d %b %Y"),
+            "created_at": self.created_at.isoformat(),
         }
 
 
@@ -408,6 +442,80 @@ def rate_limit_exceeded(e):
         ),
         429,
     )
+
+
+# ── News public ───────────────────────────────────────────────────────────────
+@app.route("/api/news", methods=["GET"])
+@limiter.exempt
+def get_news():
+    posts = (
+        NewsPost.query.filter_by(published=True)
+        .order_by(NewsPost.created_at.desc())
+        .all()
+    )
+    return jsonify([p.to_dict() for p in posts]), 200
+
+
+# ── News admin ────────────────────────────────────────────────────────────────
+@app.route("/api/admin/news", methods=["GET"])
+@require_admin
+def admin_get_news():
+    posts = NewsPost.query.order_by(NewsPost.created_at.desc()).all()
+    return jsonify([p.to_dict() for p in posts]), 200
+
+
+@app.route("/api/admin/news", methods=["POST"])
+@require_admin
+def admin_create_news():
+    data = request.get_json(silent=True) or {}
+    title = (data.get("title") or "").strip()
+    summary = (data.get("summary") or "").strip()
+    body = (data.get("body") or "").strip()
+
+    if not all([title, summary, body]):
+        return jsonify({"error": "Title, summary and body are required"}), 400
+
+    post = NewsPost(
+        type=data.get("type", "launch"),
+        title=title,
+        summary=summary,
+        body=body,
+        url=data.get("url", ""),
+        url_label=data.get("url_label", ""),
+        internal=data.get("internal", False),
+        published=data.get("published", True),
+    )
+    db.session.add(post)
+    db.session.commit()
+    return jsonify(post.to_dict()), 201
+
+
+@app.route("/api/admin/news/<int:post_id>", methods=["PUT"])
+@require_admin
+def admin_update_news(post_id):
+    post = NewsPost.query.get_or_404(post_id)
+    data = request.get_json(silent=True) or {}
+
+    post.type = data.get("type", post.type)
+    post.title = data.get("title", post.title)
+    post.summary = data.get("summary", post.summary)
+    post.body = data.get("body", post.body)
+    post.url = data.get("url", post.url)
+    post.url_label = data.get("url_label", post.url_label)
+    post.internal = data.get("internal", post.internal)
+    post.published = data.get("published", post.published)
+
+    db.session.commit()
+    return jsonify(post.to_dict()), 200
+
+
+@app.route("/api/admin/news/<int:post_id>", methods=["DELETE"])
+@require_admin
+def admin_delete_news(post_id):
+    post = NewsPost.query.get_or_404(post_id)
+    db.session.delete(post)
+    db.session.commit()
+    return jsonify({"success": True}), 200
 
 
 # ── Init ──────────────────────────────────────────────────────────────────────
